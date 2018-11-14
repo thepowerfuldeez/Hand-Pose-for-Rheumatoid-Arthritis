@@ -1,6 +1,6 @@
 import cv2
 import warnings
-import torch.optim
+import torch as t
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
@@ -13,13 +13,11 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 
-
 from MSRADataset import MSRADataset, read_depth_from_bin, get_center, _unnormalize_joints
 from REN import REN
 from loss import Modified_SmoothL1Loss
 
 warnings.simplefilter("ignore")
-
 
 parser = argparse.ArgumentParser(description='Region Ensemble Network')
 parser.add_argument('--batchSize', type=int, default=128, help='input batch size')
@@ -114,15 +112,15 @@ def main(args):
     train_dataset = MSRADataset(training=True, augment=args.augment, args=args)
     test_dataset = MSRADataset(training=False, augment=False, args=args)
 
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
+    optimizer = t.optim.Adam(model.parameters(), args.lr,
+                             # momentum=args.momentum,
+                             weight_decay=args.weight_decay)
 
-    train_loader = torch.utils.data.DataLoader(
+    train_loader = t.utils.data.DataLoader(
         train_dataset, batch_size=args.batchSize, shuffle=True,
         num_workers=0, pin_memory=False)
 
-    val_loader = torch.utils.data.DataLoader(
+    val_loader = t.utils.data.DataLoader(
         test_dataset, batch_size=args.batchSize, shuffle=True,
         num_workers=0, pin_memory=False)
 
@@ -219,7 +217,7 @@ def validate(val_loader, model, criterion, args):
     model.eval()
 
     loss_val = []
-    with torch.no_grad():
+    with t.no_grad():
         expr_dir = os.path.join(args.save_dir, args.name)
 
         for i, (input, target) in enumerate(val_loader):
@@ -246,7 +244,7 @@ def test(model, args):
     test_dataset = MSRADataset(training=False, augment=False, args=args)
     errors = []
     MAE_criterion = nn.L1Loss()
-    with torch.no_grad():
+    with t.no_grad():
         expr_dir = os.path.join(args.save_dir, args.name)
 
         input_size = args.input_size
@@ -266,9 +264,10 @@ def test(model, args):
             for j in range(len(output)):
                 tmp1[j, :2] = output[j]
             center = test_dataset.get_center(i)
-            # errors.append(compute_distance_error(_unnormalize_joints(tmp1,center,input_size), _unnormalize_joints(tmp,center,input_size)).item())
-            output = torch.from_numpy(_unnormalize_joints(tmp1, center, input_size))
-            target = torch.from_numpy(_unnormalize_joints(tmp, center, input_size))
+            # errors.append(compute_distance_error(_unnormalize_joints(tmp1,center,input_size),
+            # _unnormalize_joints(tmp,center,input_size)).item())
+            output = t.from_numpy(_unnormalize_joints(tmp1, center, input_size))
+            target = t.from_numpy(_unnormalize_joints(tmp, center, input_size))
             MAE_loss = MAE_criterion(output, target)
 
             errors.append(MAE_loss.item())
@@ -295,13 +294,13 @@ def weights_init(m):
 
 def save_checkpoint(state, is_best, opt, filename='checkpoint.pth.tar'):
     expr_dir = os.path.join(opt.save_dir, opt.name)
-    torch.save(state, os.path.join(expr_dir, filename))
+    t.save(state, os.path.join(expr_dir, filename))
     if is_best:
-        torch.save(state, os.path.join(expr_dir, 'model_best.pth.tar'))
+        t.save(state, os.path.join(expr_dir, 'model_best.pth.tar'))
 
 
 def load_checkpoint(path, model, optimizer):
-    checkpoint = torch.load(path)
+    checkpoint = t.load(path)
     model.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     epoch = checkpoint['epoch']
