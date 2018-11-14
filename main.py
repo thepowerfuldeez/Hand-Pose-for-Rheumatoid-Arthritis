@@ -1,3 +1,5 @@
+import pathlib
+
 import cv2
 import warnings
 import torch as t
@@ -31,7 +33,7 @@ parser.add_argument('--no_augment', action='store_true', help='dont augment data
 parser.add_argument('--no_validate', action='store_true', help='dont validate data when training?')
 parser.add_argument('--augment_probability', type=float, default=1.0, help='augment probability')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
-parser.add_argument('--weight_decay', type=float, default=0.0005, help='weight_decay')
+parser.add_argument('--weight_decay', type=float, default=0.001, help='weight_decay')
 parser.add_argument('--poses', type=str, default=None, nargs='+', help='poses to train on')
 parser.add_argument('--persons', type=str, default=None, nargs='+', help='persons to train on')
 parser.add_argument('--checkpoint', type=str, default=None, help='path/to/checkpoint.pth.tar')
@@ -55,16 +57,16 @@ def print_options(opt):
     message += '----------------- End -------------------'
     print(message)
     # save to the disk
-    expr_dir = os.path.join(opt.save_dir, opt.name)
+    expr_dir = opt.save_dir/opt.name
     mkdirs(expr_dir)
-    file_name = os.path.join(expr_dir, 'opt.txt')
+    file_name = expr_dir/'opt.txt'
     with open(file_name, 'wt') as opt_file:
         opt_file.write(message)
         opt_file.write('\n')
 
 
 def mkdirs(paths):
-    if isinstance(paths, list) and not isinstance(paths, str):
+    if isinstance(paths, list) and not isinstance(paths, pathlib.Path):
         for path in paths:
             mkdir(path)
     else:
@@ -72,8 +74,8 @@ def mkdirs(paths):
 
 
 def mkdir(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
+    if not path.exists():
+        path.mkdir()
 
 
 def adjust_learning_rate(optimizer, epoch, args):
@@ -139,7 +141,7 @@ def main(args):
     best = False
 
     print_options(args)
-    expr_dir = os.path.join(args.save_dir, args.name)
+    expr_dir = args.save_dir / args.name
 
     for epoch in range(current_epoch, args.epoch):
 
@@ -154,15 +156,15 @@ def main(args):
 
         state = {
             'epoch': epoch,
-            'arch': "REN",
+            'arch': type(model).__name__,
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }
 
-        if not os.path.isfile(os.path.join(expr_dir, 'model_best.pth.tar')):
+        if not (expr_dir/'model_best.pth.tar').exists():
             save_checkpoint(state, True, args)
 
-        if (args.validate) and (epoch > 1):
+        if args.validate and epoch > 1:
             best = (loss_val < min(val_loss[:len(val_loss) - 1]))
             if best:
                 print("saving best performing checkpoint on val")
@@ -171,10 +173,10 @@ def main(args):
         save_checkpoint(state, False, args)
     #
 
-    expr_dir = os.path.join(args.save_dir, args.name)
-    np.savetxt(os.path.join(expr_dir, "train_loss.out"), train_loss, fmt='%f')
+    expr_dir = args.save_dir/args.name
+    np.savetxt(str(expr_dir/"train_loss.out"), train_loss, fmt='%f')
     save_plt(train_loss, "train_loss")
-    np.savetxt(os.path.join(expr_dir, "val_loss.out"), val_loss, fmt='%f')
+    np.savetxt(str(expr_dir/"val_loss.out"), val_loss, fmt='%f')
     save_plt(val_loss, "val_loss")
 
 
@@ -182,9 +184,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     # switch to train mode
     model.train()
     loss_train = []
-    expr_dir = os.path.join(args.save_dir, args.name)
     for i, (input, target) in enumerate(train_loader):
-
         stime = time.time()
         # measure data loading time
         target = target.float()
@@ -293,10 +293,10 @@ def weights_init(m):
 
 
 def save_checkpoint(state, is_best, opt, filename='checkpoint.pth.tar'):
-    expr_dir = os.path.join(opt.save_dir, opt.name)
-    t.save(state, os.path.join(expr_dir, filename))
+    expr_dir = opt.save_dir/opt.name
+    t.save(state, str(expr_dir/filename))
     if is_best:
-        t.save(state, os.path.join(expr_dir, 'model_best.pth.tar'))
+        t.save(state, str(expr_dir/'model_best.pth.tar'))
 
 
 def load_checkpoint(path, model, optimizer):
@@ -306,11 +306,6 @@ def load_checkpoint(path, model, optimizer):
     epoch = checkpoint['epoch']
 
     return model, optimizer, epoch
-
-
-def compute_distance_error(output, target):
-    error = (np.mean(np.abs(target - output)))
-    return error
 
 
 def draw_pose(img, pose):
@@ -335,4 +330,5 @@ def save_plt(array, name):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    args.save_dir = pathlib.Path(args.save_dir)
     main(args)
