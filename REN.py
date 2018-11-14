@@ -108,34 +108,34 @@ class REN(nn.Module):
         out = self.conv0(out)
         out = self.relu0(out)
 
-        print(x.size())
+        print(out.size())
         out = self.conv1(out)
         out = self.maxpool1(out)
         out = self.relu1(out)
 
-        print(x.size())
+        print(out.size())
         out = self.conv2_dim_inc(out)
         out = self.relu2(out)
 
         out = self.res1(out)
-        print(x.size())
+        print(out.size())
         out = self.maxpool2(out)
         out = self.relu3(out)
-        print(x.size())
+        print(out.size())
         out = self.conv3_dim_inc(out)
         out = self.relu4(out)
         out = self.res2(out)
-        print(x.size())
+        print(out.size())
         out = self.maxpool3(out)
         out = self.relu5(out)  # relu5
         out = self.dropout(out)
-        print(x.size())
+        print(out.size())
         # slice
         out = self.region_ens(out)
-        print(x.size())
+        print(out.size())
         # flatten the output
         out = out.view(out.size(0), -1)
 
         out = self.fc1(out)
-        print(x.size())
+        print(out.size())
         return out
