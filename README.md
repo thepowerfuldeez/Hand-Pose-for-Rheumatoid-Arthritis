@@ -1,4 +1,4 @@
-# Pytorch Implementation of Region Ensemble Network
+…# Pytorch Implementation of Region Ensemble Network
 
 [[arxiv]](https://arxiv.org/abs/1702.02447) [[offical caffe code]](https://github.com/guohengkai/region-ensemble-network)
 
