@@ -8,13 +8,13 @@ class RegionEnsemble(nn.Module):
     def __init__(self, feat_size=12):
         assert ((feat_size / 4).is_integer())
         super(RegionEnsemble, self).__init__()
-        self.feat_size = feat_size
+        self.feat_size = int(feat_size)
         self.grids = nn.ModuleList()
         for i in range(9):
             self.grids.append(self.make_block())
 
     def make_block(self):
-        size = self.feat_size // 2
+        size = int(self.feat_size / 2)
         return nn.Sequential(
             nn.Linear(64 * size * size, 2048),
             nn.ReLU(),
