@@ -4,7 +4,7 @@ from pykinect2 import PyKinectRuntime
 from REN import REN
 from MSRADataset import MSRADataset, read_joints, read_depth_from_bin, get_center, _crop_image, _normalize_joints, \
     data_rotate_chance, data_scale_chance, data_translate_chance, _unnormalize_joints
-from main import draw_pose
+from utils import draw_pose
 import time
 import argparse
 import ctypes

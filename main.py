@@ -1,23 +1,19 @@
 import pathlib
 
-import cv2
 import warnings
 import torch as t
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
-import torchvision.models as models
 import numpy as np
 import time
 import argparse
-import datetime
 import os
-import matplotlib.pyplot as plt
 
-from MSRADataset import MSRADataset, read_depth_from_bin, get_center, _unnormalize_joints
+from MSRADataset import MSRADataset, _unnormalize_joints
 from REN import REN
 from loss import Modified_SmoothL1Loss
+from utils import print_options, adjust_learning_rate, set_default_args, weights_init, save_checkpoint, load_checkpoint, \
+    save_plt
 
 warnings.simplefilter("ignore")
 
@@ -45,62 +41,6 @@ parser.add_argument('--name', type=str, default=None,
 parser.add_argument('--finetune', action='store_true', help='use a pretrained checkpoint')
 
 
-def print_options(opt):
-    message = ''
-    message += '----------------- Options ---------------\n'
-    for k, v in sorted(vars(opt).items()):
-        comment = ''
-        default = parser.get_default(k)
-        if v != default:
-            comment = '\t[default: %s]' % str(default)
-        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
-    message += '----------------- End -------------------'
-    print(message)
-    # save to the disk
-    expr_dir = opt.save_dir/opt.name
-    mkdirs(expr_dir)
-    file_name = expr_dir/'opt.txt'
-    with open(file_name, 'wt') as opt_file:
-        opt_file.write(message)
-        opt_file.write('\n')
-
-
-def mkdirs(paths):
-    if isinstance(paths, list) and not isinstance(paths, pathlib.Path):
-        for path in paths:
-            mkdir(path)
-    else:
-        mkdir(paths)
-
-
-def mkdir(path):
-    if not path.exists():
-        path.mkdir()
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """Sets the learning rate to the initial LR decayed by 10 every args.lr_decay epochs"""
-    # lr = 0.00005
-    lr = args.lr * (0.1 ** (epoch // args.lr_decay))
-    # print("LR is " + str(lr)+ " at epoch "+ str(epoch))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-    return optimizer
-
-
-def set_default_args(args):
-    if not args.name:
-        now = datetime.datetime.now()
-        args.name = now.strftime("%Y-%m-%d-%H-%M")
-    if not args.poses:
-        args.poses = ["1", "2", "3", "4", '5', '6', '7', '8', '9', 'I', 'IP', 'L', 'MP', 'RP', 'T', 'TIP', 'Y']
-    if not args.persons:
-        args.persons = [0, 1, 2, 3, 4, 5, 6, 7]
-
-    args.augment = not args.no_augment
-    args.validate = not args.no_validate
-
-
 def main(args):
     set_default_args(args)
     model = REN(args)
@@ -114,10 +54,6 @@ def main(args):
     train_dataset = MSRADataset(training=True, augment=args.augment, args=args)
     test_dataset = MSRADataset(training=False, augment=False, args=args)
 
-    optimizer = t.optim.Adam(model.parameters(), args.lr,
-                             # momentum=args.momentum,
-                             weight_decay=args.weight_decay)
-
     train_loader = t.utils.data.DataLoader(
         train_dataset, batch_size=args.batchSize, shuffle=True,
         num_workers=0, pin_memory=False)
@@ -125,6 +61,10 @@ def main(args):
     val_loader = t.utils.data.DataLoader(
         test_dataset, batch_size=args.batchSize, shuffle=True,
         num_workers=0, pin_memory=False)
+
+    optimizer = t.optim.Adam(model.parameters(), args.lr,
+                             # momentum=args.momentum,
+                             weight_decay=args.weight_decay)
 
     current_epoch = 0
     if args.checkpoint:
@@ -284,48 +224,6 @@ def test(model, args):
                        fmt='%f')
         else:
             np.savetxt(os.path.join(expr_dir, "average_MAE_checkpoint" + args.poses[0]), np.asarray([errors]), fmt='%f')
-
-
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        nn.init.xavier_uniform_(m.weight.data)
-        # nn.init.xavier_uniform_(m.bias.data)
-
-
-def save_checkpoint(state, is_best, opt, filename='checkpoint.pth.tar'):
-    expr_dir = opt.save_dir/opt.name
-    t.save(state, str(expr_dir/filename))
-    if is_best:
-        t.save(state, str(expr_dir/'model_best.pth.tar'))
-
-
-def load_checkpoint(path, model, optimizer):
-    checkpoint = t.load(path)
-    model.load_state_dict(checkpoint['state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer'])
-    epoch = checkpoint['epoch']
-
-    return model, optimizer, epoch
-
-
-def draw_pose(img, pose):
-    for pt in pose:
-        cv2.circle(img, (int(pt[0]), int(pt[1])), 3, (0, 0, 255), -1)
-
-    for x, y in [(0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (5, 6), (6, 7), (7, 8),
-                 (0, 9), (9, 10), (10, 11), (11, 12), (0, 13), (13, 14), (14, 15), (15, 16),
-                 (0, 17), (17, 18), (18, 19), (19, 20)]:
-        cv2.line(img, (int(pose[x, 0]), int(pose[x, 1])),
-                 (int(pose[y, 0]), int(pose[y, 1])), (0, 0, 255), 1)
-
-    return img
-
-
-def save_plt(array, name):
-    plt.plot(array)
-    plt.xlabel('epoch')
-    plt.ylabel('name')
-    plt.savefig(name + '.png')
 
 
 if __name__ == '__main__':
