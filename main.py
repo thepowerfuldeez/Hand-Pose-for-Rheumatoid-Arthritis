@@ -12,8 +12,8 @@ import os
 from MSRADataset import MSRADataset, _unnormalize_joints
 from REN import REN
 from loss import Modified_SmoothL1Loss
-from utils import print_options, adjust_learning_rate, set_default_args, weights_init, save_checkpoint, load_checkpoint, \
-    save_plt
+from utils import adjust_learning_rate, set_default_args, weights_init, save_checkpoint, load_checkpoint, \
+    save_plt, mkdirs
 
 warnings.simplefilter("ignore")
 
@@ -39,6 +39,26 @@ parser.add_argument('--name', type=str, default=None,
                     help='name of the experiment. It decides where to store samples and models. if none, '
                          'it will be saved as the date and time')
 parser.add_argument('--finetune', action='store_true', help='use a pretrained checkpoint')
+
+
+def print_options(opt):
+    message = ''
+    message += '----------------- Options ---------------\n'
+    for k, v in sorted(vars(opt).items()):
+        comment = ''
+        default = parser.get_default(k)
+        if v != default:
+            comment = '\t[default: %s]' % str(default)
+        message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
+    message += '----------------- End -------------------'
+    print(message)
+    # save to the disk
+    expr_dir = opt.save_dir / opt.name
+    mkdirs(expr_dir)
+    file_name = expr_dir / 'opt.txt'
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write(message)
+        opt_file.write('\n')
 
 
 def main(args):
@@ -101,7 +121,7 @@ def main(args):
             'optimizer': optimizer.state_dict(),
         }
 
-        if not (expr_dir/'model_best.pth.tar').exists():
+        if not (expr_dir / 'model_best.pth.tar').exists():
             save_checkpoint(state, True, args)
 
         if args.validate and epoch > 1:
@@ -113,10 +133,10 @@ def main(args):
         save_checkpoint(state, False, args)
     #
 
-    expr_dir = args.save_dir/args.name
-    np.savetxt(str(expr_dir/"train_loss.out"), train_loss, fmt='%f')
+    expr_dir = args.save_dir / args.name
+    np.savetxt(str(expr_dir / "train_loss.out"), train_loss, fmt='%f')
     save_plt(train_loss, "train_loss")
-    np.savetxt(str(expr_dir/"val_loss.out"), val_loss, fmt='%f')
+    np.savetxt(str(expr_dir / "val_loss.out"), val_loss, fmt='%f')
     save_plt(val_loss, "val_loss")
 
 
